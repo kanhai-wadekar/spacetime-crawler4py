@@ -15,10 +15,12 @@ def extract_next_links(url, resp):
     #         resp.raw_response.url: the url, again
     #         resp.raw_response.content: the content of the page!
     # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
-    matches = []
+    matches = set()
     if resp.status == 200:
         # print(resp.raw_response.content)
-        pattern = r'(?<=href=").*?(?=")'
+        # match href="___" or href='___' with any number of spaces between href, = , and "/'
+        # eg) href  = "ab.com" or href='cd.edu'
+        pattern = r'href\s*=\s*([\'"])(.*?)\1'
         matches = re.findall(pattern, str(resp.raw_response.content))
     return matches
 
