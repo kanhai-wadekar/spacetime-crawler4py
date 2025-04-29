@@ -1,8 +1,29 @@
+from collections import defaultdict
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 import re
 import os
+WORD_COUNTS = defaultdict(int)
+LONGEST_PAGE = {"page":  "", "count": 0}
+
+stopwords = set({
+         "a", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any", "are", "aren't", 
+    "as", "at", "be", "because", "been", "before", "being", "below", "between", "both", "but", "by", "can't", 
+    "cannot", "could", "couldn't", "did", "didn't", "do", "does", "doesn't", "doing", "don't", "down", "during", 
+    "each", "few", "for", "from", "further", "had", "hadn't", "has", "hasn't", "have", "haven't", "having", "he", 
+    "he'd", "he'll", "he's", "her", "here", "here's", "hers", "herself", "him", "himself", "his", "how", "how's", 
+    "i", "i'd", "i'll", "i'm", "i've", "if", "in", "into", "is", "isn't", "it", "it's", "its", "itself", "let's", 
+    "me", "more", "most", "mustn't", "my", "myself", "no", "nor", "not", "of", "off", "on", "once", "only", "or", 
+    "other", "ought", "our", "ours", "ourselves", "out", "over", "own", "same", "shan't", "she", "she'd", "she'll", 
+    "she's", "should", "shouldn't", "so", "some", "such", "than", "that", "that's", "the", "their", "theirs", "them", 
+    "themselves", "then", "there", "there's", "these", "they", "they'd", "they'll", "they're", "they've", "this", 
+    "those", "through", "to", "too", "under", "until", "up", "very", "was", "wasn't", "we", "we'd", "we'll", "we're", 
+    "we've", "were", "weren't", "what", "what's", "when", "when's", "where", "where's", "which", "while", "who", 
+    "who's", "whom", "why", "why's", "with", "won't", "would", "wouldn't", "you", "you'd", "you'll", "you're", 
+    "you've", "your", "yours", "yourself", "yourselves"
+    })
+
 
 # 1. cant go to any people 
 # 2. cant go to calendar 
@@ -21,7 +42,7 @@ def scraper(url, resp):
     return [link for link in links if is_valid(link)]
 
 
-def get_stopwords(file="stopwords.txt"):
+def get_stopwords(file="./stopwords.txt"):
     """
     Read the stop words file and return it as a set.
     """
@@ -34,10 +55,10 @@ def get_stopwords(file="stopwords.txt"):
 
 
     with open(file, 'r', encoding='utf-8') as f:
-            for line in f:
-                word = line.strip() 
-                if word: 
-                    stopwords.add(word.lower())
+        for line in f:
+            word = line.strip() 
+            if word: 
+                stopwords.add(word.lower())
     return stopwords
 
 def normalize_url(url):
@@ -46,6 +67,11 @@ def normalize_url(url):
     if normalized.endswith('/'):
         normalized = normalized[:-1]
     return normalized
+
+
+def filterLinks(links, query):
+    newLinks = [link for link in links if query not in link]
+    return newLinks
 
 def extract_next_links(url, resp):
    # Implementation required.
@@ -57,7 +83,7 @@ def extract_next_links(url, resp):
    #         resp.raw_response.url: the url, again
    #         resp.raw_response.content: the content of the page!
    # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
-    stopwords = get_stopwords()
+    
     
     links = []
 
@@ -88,6 +114,32 @@ def extract_next_links(url, resp):
         words = page_text.lower().split()
         filtered_words = [word for word in words if word not in stopwords]
 
+        # check longest page
+        if LONGEST_PAGE["count"] < len(words):
+            LONGEST_PAGE["page"] = resp.url
+            LONGEST_PAGE["count"] = len(words)
+            print(f"NEW LONGEST PAGE: {len(words)}, {resp.url}")
+        
+        with open("./Logs/commonwords.txt", "w") as f:
+            print(f"LONGEST PAGE: {LONGEST_PAGE['count']}, {LONGEST_PAGE['page']}", file=f)
+        
+        # Update words dict
+        for word in filtered_words:
+            if (len(word) > 2):
+                if word not in WORD_COUNTS:
+                    WORD_COUNTS[word] += 1
+                else:
+                    WORD_COUNTS[word] += 1
+        
+        with open("./Logs/commonwords.txt", "a") as f:
+            sorted_dict_desc = dict(sorted(WORD_COUNTS.items(), key=lambda item: item[1], reverse=True))
+            i = 0
+            for key in sorted_dict_desc:
+                print(f"{key}: {sorted_dict_desc[key]}", file=f)
+                if i > 49:
+                    break
+                i += 1
+
         with open("text.txt", "a", encoding="utf-8") as f:  #"a" to append
             f.write(f"URL: {url}\n")
             f.write(' '.join(filtered_words) + "\n\n")  # join words back into a string
@@ -99,10 +151,11 @@ def extract_next_links(url, resp):
             absolute_url = urljoin(url, href)
             links.append(normalize_url(absolute_url))
 
+        links = [link for link in links if "thornton" not in link]
 
     except Exception as e:
         print(f"Error parsing {url}: {e}")
-  
+    
     return links
 
 
@@ -115,6 +168,10 @@ def is_valid(url):
     
     try:
         parsed = urlparse(url)
+
+        path = parsed.path.split("/")[1:]
+
+        # print(path)
         if parsed.scheme not in set(["http", "https"]):
             return False
 
@@ -123,6 +180,17 @@ def is_valid(url):
 
         if not parsed.netloc.endswith(".uci.edu") and "today.uci.edu" not in parsed.netloc:
             return False
+        if (path):
+            if (path[0] == "~thornton" or "drupal" in path):
+                return False
+            
+            if ("pdf" in path):
+                return False
+
+            if ("seminarseries" in path):
+                return False
+
+        
 
         return not re.match(
             r".*\.(css|js|bmp|gif|jpe?g|ico"
@@ -132,7 +200,8 @@ def is_valid(url):
             + r"|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso"
             + r"|epub|dll|cnf|tgz|sha1"
             + r"|thmx|mso|arff|rtf|jar|csv"
-            + r"|rm|smil|wmv|swf|wma|zip|rar|gz|war|img)$", parsed.path.lower())
+            + r"|rm|smil|wmv|swf|wma|zip|rar|gz|war|img|mpg|apk"
+            + r"|c|py|ipynb|h|cp|pov)$", parsed.path.lower())
 
 
     except TypeError:
