@@ -189,6 +189,9 @@ def is_valid(url):
 
             if ("seminarseries" in path):
                 return False
+            
+            if (path[0] == "~eppstein" and "pix" in path):
+                return False
 
         
 
