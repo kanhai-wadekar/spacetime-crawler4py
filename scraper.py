@@ -1,6 +1,5 @@
 import re
 from urllib.parse import urlparse
-from launch import WORD_COUNTS
 
 def scraper(url, resp):
     links = extract_next_links(url, resp)

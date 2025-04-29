@@ -6,7 +6,7 @@ from utils import get_logger
 import scraper
 import time
 import re
-from re import BeautifulSoup
+from bs4 import BeautifulSoup
 
 from collections import defaultdict
 
@@ -63,10 +63,12 @@ class Worker(Thread):
                 self.logger.info("Frontier is empty. Stopping Crawler.")
                 break
             resp = download(tbd_url, self.config, self.logger)
+            # run statistics on current url
             self.extract_words(resp)
             self.logger.info(
                 f"Downloaded {tbd_url}, status <{resp.status}>, "
                 f"using cache {self.config.cache_server}.")
+            # then fetch all new urls to be added to the frontier
             scraped_urls = scraper.scraper(tbd_url, resp)
             for scraped_url in scraped_urls:
 
