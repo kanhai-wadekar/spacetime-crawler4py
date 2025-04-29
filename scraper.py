@@ -42,7 +42,7 @@ def get_stopwords(file="stopwords.txt"):
 
 def normalize_url(url):
     parsed = urlparse(url)
-    normalized = parsed._replace(fragment="", query="").geturl()
+    normalized = parsed._replace(fragment="").geturl()
     if normalized.endswith('/'):
         normalized = normalized[:-1]
     return normalized
@@ -63,6 +63,20 @@ def extract_next_links(url, resp):
 
 
     if resp.status != 200:
+        if resp.status < 400:
+            with open('./Logs/3xx.txt', 'a') as log:
+                print(f'URL: {resp.url} | STATUS: <{resp.status}> | ERROR: "{resp.error}"', file=log)
+        elif resp.status < 500:
+            with open('./Logs/4xx.txt', 'a') as log:
+                print(f'URL: {resp.url} | STATUS: <{resp.status}> | ERROR: "{resp.error}"', file=log)
+        elif resp.status < 600:
+            with open('./Logs/5xx.txt', 'a') as log:
+                print(f'URL: {resp.url} | STATUS: <{resp.status}> | ERROR: "{resp.error}"', file=log)
+        elif resp.status < 700:
+            with open('./Logs/6xx.txt', 'a') as log:
+                print(f'URL: {resp.url} | STATUS: <{resp.status}> | ERROR: "{resp.error}"', file=log)
+
+
         return links  # return empty list if page did not load correctly
   
     try:
