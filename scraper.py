@@ -33,7 +33,7 @@ def get_stopwords(file="stopwords.txt"):
    return stopwords
 
 
-def extract_next_links(url, resp, mode="dict"):
+def extract_next_links(url, resp, mode="file"):
    # Implementation required.
    # url: the URL that was used to get the page
    # resp.url: the actual url of the page
