@@ -225,6 +225,10 @@ def is_valid(url):
                 if ("fuzzy" in path[-1] or (len(path) > 1 and "fuzzy" in path[-2])):
                     return False
 
+            # Prevents Trap in Homeland security page
+            if ("EMWS09" in path):
+                return False
+
 
             # upon a preliminary scrape, all urls belonging to either result in 4xx and 6xx errors respectively
             if (path[0] == "~thornton" or "drupal" in path):
@@ -246,9 +250,9 @@ def is_valid(url):
                 if ("163" in path and "s15-" in path):
                     return False
                 # Low on information in the rare case that 200s
-                if path[1] == "ca":
+                if len(path) > 1 and path[1] == "ca":
                     return False
-                if path[1].startswith("hw"):
+                if len(path) > 1 and path[1].startswith("hw"):
                     return False
             
              # upon a preliminary scrape, all urls belonging to path including this string raise 4xx series errors
