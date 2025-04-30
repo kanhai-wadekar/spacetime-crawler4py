@@ -6,31 +6,29 @@ import re
 import os
 WORD_COUNTS = defaultdict(int)
 LONGEST_PAGE = {"page":  "", "count": 0}
+SUBDOMAINS = defaultdict(int)
+UNIQUE_PAGES = 0
 
-stopwords = set({
-         "a", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any", "are", "aren't", 
-    "as", "at", "be", "because", "been", "before", "being", "below", "between", "both", "but", "by", "can't", 
-    "cannot", "could", "couldn't", "did", "didn't", "do", "does", "doesn't", "doing", "don't", "down", "during", 
-    "each", "few", "for", "from", "further", "had", "hadn't", "has", "hasn't", "have", "haven't", "having", "he", 
-    "he'd", "he'll", "he's", "her", "here", "here's", "hers", "herself", "him", "himself", "his", "how", "how's", 
-    "i", "i'd", "i'll", "i'm", "i've", "if", "in", "into", "is", "isn't", "it", "it's", "its", "itself", "let's", 
-    "me", "more", "most", "mustn't", "my", "myself", "no", "nor", "not", "of", "off", "on", "once", "only", "or", 
-    "other", "ought", "our", "ours", "ourselves", "out", "over", "own", "same", "shan't", "she", "she'd", "she'll", 
-    "she's", "should", "shouldn't", "so", "some", "such", "than", "that", "that's", "the", "their", "theirs", "them", 
-    "themselves", "then", "there", "there's", "these", "they", "they'd", "they'll", "they're", "they've", "this", 
-    "those", "through", "to", "too", "under", "until", "up", "very", "was", "wasn't", "we", "we'd", "we'll", "we're", 
-    "we've", "were", "weren't", "what", "what's", "when", "when's", "where", "where's", "which", "while", "who", 
-    "who's", "whom", "why", "why's", "with", "won't", "would", "wouldn't", "you", "you'd", "you'll", "you're", 
+STOPWORDS = {
+    "a", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any", "are", "aren't",
+    "as", "at", "be", "because", "been", "before", "being", "below", "between", "both", "but", "by", "can't",
+    "cannot", "could", "couldn't", "did", "didn't", "do", "does", "doesn't", "doing", "don't", "down", "during",
+    "each", "few", "for", "from", "further", "had", "hadn't", "has", "hasn't", "have", "haven't", "having", "he",
+    "he'd", "he'll", "he's", "her", "here", "here's", "hers", "herself", "him", "himself", "his", "how", "how's",
+    "i", "i'd", "i'll", "i'm", "i've", "if", "in", "into", "is", "isn't", "it", "it's", "its", "itself", "let's",
+    "me", "more", "most", "mustn't", "my", "myself", "no", "nor", "not", "of", "off", "on", "once", "only", "or",
+    "other", "ought", "our", "ours", "ourselves", "out", "over", "own", "same", "shan't", "she", "she'd", "she'll",
+    "she's", "should", "shouldn't", "so", "some", "such", "than", "that", "that's", "the", "their", "theirs", "them",
+    "themselves", "then", "there", "there's", "these", "they", "they'd", "they'll", "they're", "they've", "this",
+    "those", "through", "to", "too", "under", "until", "up", "very", "was", "wasn't", "we", "we'd", "we'll", "we're",
+    "we've", "were", "weren't", "what", "what's", "when", "when's", "where", "where's", "which", "while", "who",
+    "who's", "whom", "why", "why's", "with", "won't", "would", "wouldn't", "you", "you'd", "you'll", "you're",
     "you've", "your", "yours", "yourself", "yourselves"
-    })
+}
 
-
-# 1. cant go to any people 
-# 2. cant go to calendar 
-
-
-SITE_DATA = {}
-
+ALLOWED_DOMAINS = {".ics.uci.edu", ".cs.uci.edu", ".informatics.uci.edu", ".stat.uci.edu", "today.uci.edu"}
+ROBOTS_BLOCKED = {urlparse('http://www.ics.uci.edu/people'), urlparse('http://intranet.ics.uci.edu')}
+SERVER_SIDE_ERROR = {urlparse("http://www.ics.uci.edu/mailing_lists.html"), urlparse("http://www.ics.uci.edu/4_07social_activities.html"), urlparse("http://www.ics.uci.edu/2_3tutorial proposals.html"), urlparse("http://www.ics.uci.edu/teachingics.html")}
 
 def scraper(url, resp):
     visited = set()
@@ -40,26 +38,6 @@ def scraper(url, resp):
     visited.add(norm)
     links = extract_next_links(url, resp)
     return [link for link in links if is_valid(link)]
-
-
-def get_stopwords(file="./stopwords.txt"):
-    """
-    Read the stop words file and return it as a set.
-    """
-    stopwords = set()
-
-
-    if not os.path.exists(file):
-        print("You need a file of stopwords named stopwords.txt - this path does not exists!")
-        return stopwords
-
-
-    with open(file, 'r', encoding='utf-8') as f:
-        for line in f:
-            word = line.strip() 
-            if word: 
-                stopwords.add(word.lower())
-    return stopwords
 
 def normalize_url(url):
     parsed = urlparse(url)
@@ -75,11 +53,8 @@ def is_float(string):
     except ValueError:
         return False
 
-def filterLinks(links, query):
-    newLinks = [link for link in links if query not in link]
-    return newLinks
-
 def extract_next_links(url, resp):
+    global UNIQUE_PAGES
    # Implementation required.
    # url: the URL that was used to get the page
    # resp.url: the actual url of the page
@@ -110,15 +85,19 @@ def extract_next_links(url, resp):
 
 
         return links  # return empty list if page did not load correctly
-  
+    
     try:
         soup = BeautifulSoup(resp.raw_response.content, "html.parser")
+
+        # Remove script and style elements
+        for script_or_style in soup(['script', 'style']):
+            script_or_style.decompose()
 
 
         page_text = soup.get_text(separator=' ', strip=True)
         page_text = re.sub(r'[^a-zA-Z0-9\s]', '', page_text)  # remove non-alphanumeric characters
         words = page_text.lower().split()
-        filtered_words = [word for word in words if word not in stopwords]
+        filtered_words = [word for word in words if word not in STOPWORDS]
 
         # check longest page
         if LONGEST_PAGE["count"] < len(words):
@@ -126,30 +105,16 @@ def extract_next_links(url, resp):
             LONGEST_PAGE["count"] = len(words)
             print(f"NEW LONGEST PAGE: {len(words)}, {resp.url}")
         
-        with open("./Logs/commonwords.txt", "w") as f:
-            print(f"LONGEST PAGE: {LONGEST_PAGE['count']}, {LONGEST_PAGE['page']}", file=f)
+        
         
         # Update words dict
         for word in filtered_words:
             if (len(word) > 2):
-                if word not in WORD_COUNTS:
-                    WORD_COUNTS[word] += 1
-                else:
-                    WORD_COUNTS[word] += 1
-        
-        with open("./Logs/commonwords.txt", "a") as f:
-            sorted_dict_desc = dict(sorted(WORD_COUNTS.items(), key=lambda item: item[1], reverse=True))
-            i = 0
-            for key in sorted_dict_desc:
-                print(f"{key}: {sorted_dict_desc[key]}", file=f)
-                if i > 49:
-                    break
-                i += 1
+                WORD_COUNTS[word] += 1
 
-        with open("text.txt", "a", encoding="utf-8") as f:  #"a" to append
-            f.write(f"URL: {url}\n")
-            f.write(' '.join(filtered_words) + "\n\n")  # join words back into a string
-
+        # Update subdomains dict
+        parsed_url = urlparse(resp.url)
+        SUBDOMAINS[parsed_url.netloc] += 1
 
         #Extract links
         for anchor in soup.find_all('a', href=True):
@@ -157,7 +122,39 @@ def extract_next_links(url, resp):
             absolute_url = urljoin(url, href)
             links.append(normalize_url(absolute_url))
 
-        links = [link for link in links if "thornton" not in link]
+        UNIQUE_PAGES += 1
+
+        # ---------------------------------------------
+        # --------- LOGGING ON OUR SIDE ---------------
+        # ---------------------------------------------
+
+        with open("./Logs/commonwords.txt", "w") as f:
+            print(f"LONGEST PAGE: {LONGEST_PAGE['count']}, {LONGEST_PAGE['page']}\n", file=f)
+            print(f'UNIQUE PAGES FOUND: {UNIQUE_PAGES}\n', file=f)
+
+        # with open("./Logs/commonwords.txt", "a") as f:
+            sorted_dict_desc = dict(sorted(WORD_COUNTS.items(), key=lambda item: item[1], reverse=True))
+            i = 0
+            for key in sorted_dict_desc:
+                print(f"{key}: {sorted_dict_desc[key]}", file=f)
+                if i > 49:
+                    break
+                i += 1
+            print('\n', file=f)
+            
+            sorted_subdomains = dict(sorted(SUBDOMAINS.items(), key=lambda item: item[0]))
+            for key in sorted_subdomains:
+                print(f"{key}, {sorted_subdomains[key]}", file=f)
+            
+
+        # with open("text.txt", "a", encoding="utf-8") as f:  #"a" to append
+        #     f.write(f"URL: {url}\n")
+        #     f.write(' '.join(filtered_words) + "\n\n")  # join words back into a string
+
+
+        # ---------------------------------------------
+        # --------------- END LOGGING  ----------------
+        # ---------------------------------------------
 
     except Exception as e:
         print(f"Error parsing {url}: {e}")
@@ -169,8 +166,6 @@ def is_valid(url):
    # Decide whether to crawl this url or not.
    # If you decide to crawl it, return True; otherwise return False.
    # There are already some conditions that return False.
-
-    allowed_domains = set([".ics.uci.edu", ".cs.uci.edu", ".informatics.uci.edu", ".stat.uci.edu", "today.uci.edu"])
     
     try:
         parsed = urlparse(url)
@@ -181,9 +176,17 @@ def is_valid(url):
         if parsed.scheme not in set(["http", "https"]):
             return False
 
-        if not any(domain in parsed.netloc for domain in allowed_domains):
+        if not any(domain in parsed.netloc for domain in ALLOWED_DOMAINS):
             return False
 
+        if any(parsed.netloc == url.netloc and parsed.path == url.path for url in ROBOTS_BLOCKED):
+            return False
+        
+        if any(parsed.netloc == url.netloc and parsed.path == url.path for url in SERVER_SIDE_ERROR):
+            return False
+
+        # In the case that the authority is *today.uci.edu.SOMETHING
+        # this domain is not up for some reason  
         if not parsed.netloc.endswith(".uci.edu") and "today.uci.edu" not in parsed.netloc:
             return False
         
@@ -197,8 +200,18 @@ def is_valid(url):
             return False
         
         
+        
 
         if (path):
+            # Avoid going down dates in the ICS Calendar
+            if parsed.netloc == 'ics.uci.edu':
+                if (path[0] == "events" and len(path) > 1):
+                    return False
+                
+            if parsed.netloc == "sli.ics.uci.edu":
+                if path[0] == "Classes" or path[0] == "Pubs" or path[0] == "video":
+                    return False
+
             if ("flamingo" in parsed.netloc):
                 if ("apache" in path[-1]):
                     return False
@@ -209,26 +222,41 @@ def is_valid(url):
                 if (is_float(path[-1])):
                     return False
                 
-                if ("fuzzy" in path[-1] or "fuzzy" in path[-2]):
+                if ("fuzzy" in path[-1] or (len(path) > 1 and "fuzzy" in path[-2])):
                     return False
 
 
-            # print(parsed)
+            # upon a preliminary scrape, all urls belonging to either result in 4xx and 6xx errors respectively
             if (path[0] == "~thornton" or "drupal" in path):
                 return False
             
+            # overly large size that takes up compute
             if ("pdf" in path):
                 return False
 
+            # upon a preliminary scrape, all urls belonging to path including this string raise 4xx series errors
             if ("seminarseries" in path):
                 return False
             
             if (path[0] == "~eppstein" ):
-                if ("pix" in path or "pubs"):
+                # Too many urls matching following patterns that have little to no valuable textual information
+                # Unintentional trap 
+                if ("pix" in path or "pubs" in path):
                     return False
                 if ("163" in path and "s15-" in path):
                     return False
+                # Low on information in the rare case that 200s
+                if path[1] == "ca":
+                    return False
+                if path[1].startswith("hw"):
+                    return False
             
+             # upon a preliminary scrape, all urls belonging to path including this string raise 4xx series errors
+            if ("prof-david-redmiles" in path):
+                return False
+            
+            if ("doku.php" in path):
+                return False
 
 
         
@@ -239,10 +267,10 @@ def is_valid(url):
             + r"|wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf"
             + r"|ps|eps|tex|ppt|pptx|doc|docx|xls|xlsx|names"
             + r"|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso"
-            + r"|epub|dll|cnf|tgz|sha1"
+            + r"|epub|dll|cnf|tgz|sha1|m|ma|nb"
             + r"|thmx|mso|arff|rtf|jar|csv"
             + r"|rm|smil|wmv|swf|wma|zip|rar|gz|war|img|mpg|apk"
-            + r"|c|py|ipynb|h|cp|pov)$", parsed.path.lower())
+            + r"|c|py|ipynb|h|cp|pov|lif)$", parsed.path.lower())
 
 
     except TypeError:
