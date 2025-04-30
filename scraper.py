@@ -199,18 +199,26 @@ def is_valid(url):
         if "jujube" in parsed.netloc:
             return False
         
+        if "sli.ics.uci.edu" in parsed.netloc:
+            return False
         
+
         
 
         if (path):
+
+            if ("~" in path[-1] and len(path) == 1):
+                return False
+
             # Avoid going down dates in the ICS Calendar
             if parsed.netloc == 'ics.uci.edu':
                 if (path[0] == "events" and len(path) > 1):
                     return False
                 
             if parsed.netloc == "sli.ics.uci.edu":
-                if path[0] == "Classes" or path[0] == "Pubs" or path[0] == "video":
-                    return False
+                return False
+                # if path[0] == "Classes" or path[0] == "Pubs" or path[0] == "video":
+                #     return False
 
             if ("flamingo" in parsed.netloc):
                 if ("apache" in path[-1]):
@@ -247,7 +255,7 @@ def is_valid(url):
                 # Unintentional trap 
                 if ("pix" in path or "pubs" in path):
                     return False
-                if ("163" in path and "s15-" in path):
+                if ("163" in path):
                     return False
                 # Low on information in the rare case that 200s
                 if len(path) > 1 and path[1] == "ca":
