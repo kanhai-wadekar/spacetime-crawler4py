@@ -30,6 +30,8 @@ ALLOWED_DOMAINS = {".ics.uci.edu", ".cs.uci.edu", ".informatics.uci.edu", ".stat
 ROBOTS_BLOCKED = {urlparse('http://www.ics.uci.edu/people'), urlparse('http://intranet.ics.uci.edu')}
 SERVER_SIDE_ERROR = {urlparse("http://www.ics.uci.edu/mailing_lists.html"), urlparse("http://www.ics.uci.edu/4_07social_activities.html"), urlparse("http://www.ics.uci.edu/2_3tutorial proposals.html"), urlparse("http://www.ics.uci.edu/teachingics.html")}
 
+BAD_SUBDOMAINS = { "fano", "dblp", "jujube", "sli.ics.uci.edu",  "wics.ics.uci.edu",  "computableplant.ics.uci.edu" }
+
 def scraper(url, resp):
     visited = set()
     norm = normalize_url(url)
@@ -189,36 +191,28 @@ def is_valid(url):
         # this domain is not up for some reason  
         if not parsed.netloc.endswith(".uci.edu") and "today.uci.edu" not in parsed.netloc:
             return False
-        
-        if "fano" in parsed.netloc:
-            return False
-        
-        if "dblp" in parsed.netloc:
-            return False
 
-        if "jujube" in parsed.netloc:
+        if any(subdomain in parsed.netloc for subdomain in BAD_SUBDOMAINS):
             return False
-        
-        if "sli.ics.uci.edu" in parsed.netloc:
-            return False
-        
-
-        
 
         if (path):
 
             if ("~" in path[-1] and len(path) == 1):
                 return False
+            
+            if (any("uploads" in el  for el in path)):
+                return False
 
             # Avoid going down dates in the ICS Calendar
-            if parsed.netloc == 'ics.uci.edu':
-                if (path[0] == "events" and len(path) > 1):
-                    return False
+            # if parsed.netloc == 'ics.uci.edu':
+            if (path[0] == "events" and len(path) > 1):
+                return False
                 
-            if parsed.netloc == "sli.ics.uci.edu":
+            if  "sli.ics.uci.edu" in parsed.netloc:
                 return False
                 # if path[0] == "Classes" or path[0] == "Pubs" or path[0] == "video":
                 #     return False
+            
 
             if ("flamingo" in parsed.netloc):
                 if ("apache" in path[-1]):
@@ -230,8 +224,8 @@ def is_valid(url):
                 if (is_float(path[-1])):
                     return False
                 
-                if ("fuzzy" in path[-1] or (len(path) > 1 and "fuzzy" in path[-2])):
-                    return False
+            if ("fuzzy" in path[-1] or (len(path) > 1 and "fuzzy" in path[-2])):
+                return False
 
             # Prevents Trap in Homeland security page
             if ("EMWS09" in path):
@@ -282,7 +276,7 @@ def is_valid(url):
             + r"|epub|dll|cnf|tgz|sha1|m|ma|nb"
             + r"|thmx|mso|arff|rtf|jar|csv"
             + r"|rm|smil|wmv|swf|wma|zip|rar|gz|war|img|mpg|apk"
-            + r"|c|py|ipynb|h|cp|pov|lif)$", parsed.path.lower())
+            + r"|c|py|ipynb|h|cp|pov|lif|ppsx)$", parsed.path.lower())
 
 
     except TypeError:
