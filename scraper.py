@@ -68,6 +68,12 @@ def normalize_url(url):
         normalized = normalized[:-1]
     return normalized
 
+def is_float(string):
+    try:
+        float(string)
+        return True
+    except ValueError:
+        return False
 
 def filterLinks(links, query):
     newLinks = [link for link in links if query not in link]
@@ -180,7 +186,34 @@ def is_valid(url):
 
         if not parsed.netloc.endswith(".uci.edu") and "today.uci.edu" not in parsed.netloc:
             return False
+        
+        if "fano" in parsed.netloc:
+            return False
+        
+        if "dblp" in parsed.netloc:
+            return False
+
+        if "jujube" in parsed.netloc:
+            return False
+        
+        
+
         if (path):
+            if ("flamingo" in parsed.netloc):
+                if ("apache" in path[-1]):
+                    return False
+                
+                if ("releases" in path and ("docs" in path or "src" in path)):
+                    return False
+                
+                if (is_float(path[-1])):
+                    return False
+                
+                if ("fuzzy" in path[-1] or "fuzzy" in path[-2]):
+                    return False
+
+
+            # print(parsed)
             if (path[0] == "~thornton" or "drupal" in path):
                 return False
             
@@ -190,8 +223,13 @@ def is_valid(url):
             if ("seminarseries" in path):
                 return False
             
-            if (path[0] == "~eppstein" and "pix" in path):
-                return False
+            if (path[0] == "~eppstein" ):
+                if ("pix" in path or "pubs"):
+                    return False
+                if ("163" in path and "s15-" in path):
+                    return False
+            
+
 
         
 
