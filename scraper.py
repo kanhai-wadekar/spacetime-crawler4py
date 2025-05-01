@@ -27,10 +27,10 @@ STOPWORDS = {
 }
 
 ALLOWED_DOMAINS = {".ics.uci.edu", ".cs.uci.edu", ".informatics.uci.edu", ".stat.uci.edu", "today.uci.edu"}
-ROBOTS_BLOCKED = {urlparse('http://www.ics.uci.edu/people'), urlparse('http://intranet.ics.uci.edu')}
-SERVER_SIDE_ERROR = {urlparse("http://www.ics.uci.edu/mailing_lists.html"), urlparse("http://www.ics.uci.edu/4_07social_activities.html"), urlparse("http://www.ics.uci.edu/2_3tutorial proposals.html"), urlparse("http://www.ics.uci.edu/teachingics.html")}
+ROBOTS_BLOCKED = {urlparse('https://cs.ics.uci.edu/people'), urlparse('http://kdd.ics.uci.edu'), urlparse('https://www.ics.uci.edu/people/'), urlparse('http://www.ics.uci.edu/happening/news'), urlparse('http://www.ics.uci.edu/people'), urlparse('http://intranet.ics.uci.edu')}
+SERVER_SIDE_ERROR = {urlparse('http://www.ics.uci.edu/research.htm'), urlparse('http://cloudberry.ics.uci.edu/apps/twittermap'), urlparse('http://cloudberry.ics.uci.edu/demos/twittermap'), urlparse("http://www.ics.uci.edu/mailing_lists.html"), urlparse("http://www.ics.uci.edu/4_07social_activities.html"), urlparse("http://www.ics.uci.edu/2_3tutorial proposals.html"), urlparse("http://www.ics.uci.edu/teachingics.html")}
 
-BAD_SUBDOMAINS = { "fano", "dblp", "jujube", "sli.ics.uci.edu",  "wics.ics.uci.edu",  "computableplant.ics.uci.edu" }
+BAD_SUBDOMAINS = { "fano", "dblp", "jujube", "sli.ics.uci.edu",  "wics.ics.uci.edu",  "computableplant.ics.uci.edu", "grape.ics.uci.edu" }
 
 def scraper(url, resp):
     visited = set()
@@ -88,6 +88,9 @@ def extract_next_links(url, resp):
 
         return links  # return empty list if page did not load correctly
     
+    with open('./Logs/2xx.txt', 'a') as log:
+        print(f'URL: {resp.url} | STATUS: <{resp.status}> | ERROR: "{resp.error}"', file=log)
+
     try:
         soup = BeautifulSoup(resp.raw_response.content, "html.parser")
 
@@ -147,12 +150,6 @@ def extract_next_links(url, resp):
             sorted_subdomains = dict(sorted(SUBDOMAINS.items(), key=lambda item: item[0]))
             for key in sorted_subdomains:
                 print(f"{key}, {sorted_subdomains[key]}", file=f)
-            
-
-        # with open("text.txt", "a", encoding="utf-8") as f:  #"a" to append
-        #     f.write(f"URL: {url}\n")
-        #     f.write(' '.join(filtered_words) + "\n\n")  # join words back into a string
-
 
         # ---------------------------------------------
         # --------------- END LOGGING  ----------------
@@ -189,13 +186,20 @@ def is_valid(url):
 
         # In the case that the authority is *today.uci.edu.SOMETHING
         # this domain is not up for some reason  
-        if not parsed.netloc.endswith(".uci.edu") and "today.uci.edu" not in parsed.netloc:
-            return False
+        
+
+        # if not parsed.netloc.endswith(".uci.edu") and "today.uci.edu" not in parsed.netloc:
+        #     return False
 
         if any(subdomain in parsed.netloc for subdomain in BAD_SUBDOMAINS):
             return False
 
+        # MAYBE BLOCK https://grape.ics.uci.edu/wiki/asterix/timeline?from=2018   ?
         if (path):
+            if 'today.uci.edu' in parsed.netloc:
+                if parsed.path.startswith('department/information_computer_sciences'):
+                    return True
+                return False
 
             if ("~" in path[-1] and len(path) == 1):
                 return False
@@ -233,12 +237,16 @@ def is_valid(url):
 
 
             # upon a preliminary scrape, all urls belonging to either result in 4xx and 6xx errors respectively
-            if (path[0] == "~thornton" or "drupal" in path):
+            if (path[0] == "~thornton" or "drupal" in path or "~elzarki" in path):
                 return False
             
             # overly large size that takes up compute
             if ("pdf" in path):
                 return False
+            
+            if ("cert.ics.uci.edu" in parsed.netloc):
+                if ("Nanda" in path):
+                    return False
 
             # upon a preliminary scrape, all urls belonging to path including this string raise 4xx series errors
             if ("seminarseries" in path):
@@ -257,6 +265,22 @@ def is_valid(url):
                 if len(path) > 1 and path[1].startswith("hw"):
                     return False
             
+            # Low [quality] content site family
+            if path[0] == '~irus':
+                return False
+                
+            if path[0] == "~smyth":
+                if len(path) > 1 and path[1] == 'courses':
+                    return False
+                
+            if path[0] == "~dechter" and len(path) > 1:
+                if path[1].startswith('r'):
+                    return False
+                # Low [quality] content site family
+                if path[1] == 'publications':
+                    return False
+                
+            
              # upon a preliminary scrape, all urls belonging to path including this string raise 4xx series errors
             if ("prof-david-redmiles" in path):
                 return False
@@ -274,9 +298,9 @@ def is_valid(url):
             + r"|ps|eps|tex|ppt|pptx|doc|docx|xls|xlsx|names"
             + r"|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso"
             + r"|epub|dll|cnf|tgz|sha1|m|ma|nb"
-            + r"|thmx|mso|arff|rtf|jar|csv"
+            + r"|thmx|mso|arff|rtf|jar|csv|shtml|htm"
             + r"|rm|smil|wmv|swf|wma|zip|rar|gz|war|img|mpg|apk"
-            + r"|c|py|ipynb|h|cp|pov|lif|ppsx)$", parsed.path.lower())
+            + r"|c|py|ipynb|h|cp|pov|lif|ppsx|pps)$", parsed.path.lower())
 
 
     except TypeError:
