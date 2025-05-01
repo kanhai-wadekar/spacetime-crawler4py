@@ -196,6 +196,9 @@ def is_valid(url):
 
         # MAYBE BLOCK https://grape.ics.uci.edu/wiki/asterix/timeline?from=2018   ?
         if (path):
+            if 'fr.ics.uci.edu' in parsed.netloc:
+                return False
+            
             if 'today.uci.edu' in parsed.netloc:
                 if parsed.path.startswith('department/information_computer_sciences'):
                     return True
@@ -297,7 +300,7 @@ def is_valid(url):
             + r"|wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf"
             + r"|ps|eps|tex|ppt|pptx|doc|docx|xls|xlsx|names"
             + r"|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso"
-            + r"|epub|dll|cnf|tgz|sha1|m|ma|nb"
+            + r"|epub|dll|cnf|tgz|sha1|m|ma|nb|pd"
             + r"|thmx|mso|arff|rtf|jar|csv|shtml|htm"
             + r"|rm|smil|wmv|swf|wma|zip|rar|gz|war|img|mpg|apk"
             + r"|c|py|ipynb|h|cp|pov|lif|ppsx|pps)$", parsed.path.lower())
