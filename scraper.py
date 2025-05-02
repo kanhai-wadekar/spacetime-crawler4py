@@ -4,6 +4,11 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 import re
 import os
+
+# ---------------------------------------------
+# ----------------- GLOBALS -------------------
+# ---------------------------------------------
+
 WORD_COUNTS = defaultdict(int)
 LONGEST_PAGE = {"page":  "", "count": 0}
 SUBDOMAINS = defaultdict(int)
@@ -29,18 +34,11 @@ STOPWORDS = {
 ALLOWED_DOMAINS = {".ics.uci.edu", ".cs.uci.edu", ".informatics.uci.edu", ".stat.uci.edu", "today.uci.edu"}
 ROBOTS_BLOCKED = {urlparse('https://cs.ics.uci.edu/people'), urlparse('http://kdd.ics.uci.edu'), urlparse('https://www.ics.uci.edu/people/'), urlparse('http://www.ics.uci.edu/happening/news'), urlparse('http://www.ics.uci.edu/people'), urlparse('http://intranet.ics.uci.edu')}
 SERVER_SIDE_ERROR = {urlparse('http://www.ics.uci.edu/research.htm'), urlparse('http://cloudberry.ics.uci.edu/apps/twittermap'), urlparse('http://cloudberry.ics.uci.edu/demos/twittermap'), urlparse("http://www.ics.uci.edu/mailing_lists.html"), urlparse("http://www.ics.uci.edu/4_07social_activities.html"), urlparse("http://www.ics.uci.edu/2_3tutorial proposals.html"), urlparse("http://www.ics.uci.edu/teachingics.html")}
+BAD_SUBDOMAINS = { "fano", "dblp", "jujube", "sli.ics.uci.edu", "computableplant.ics.uci.edu", "grape.ics.uci.edu" }
 
-BAD_SUBDOMAINS = { "fano", "dblp", "jujube", "sli.ics.uci.edu",  "wics.ics.uci.edu",  "computableplant.ics.uci.edu", "grape.ics.uci.edu" }
-
-def scraper(url, resp):
-    visited = set()
-    norm = normalize_url(url)
-    if norm in visited:
-        return []
-    visited.add(norm)
-    links = extract_next_links(url, resp)
-    return [link for link in links if is_valid(link)]
-
+# ---------------------------------------------
+# ----------------- HELPERS -------------------
+# ---------------------------------------------
 def normalize_url(url):
     parsed = urlparse(url)
     normalized = parsed._replace(fragment="").geturl()
@@ -54,6 +52,18 @@ def is_float(string):
         return True
     except ValueError:
         return False
+    
+
+def scraper(url, resp):
+    visited = set()
+    norm = normalize_url(url)
+    if norm in visited:
+        return []
+    visited.add(norm)
+    links = extract_next_links(url, resp)
+    return [link for link in links if is_valid(link)]
+
+
 
 def extract_next_links(url, resp):
     global UNIQUE_PAGES
@@ -69,7 +79,6 @@ def extract_next_links(url, resp):
     
     
     links = []
-
 
     if resp.status != 200:
         if resp.status < 400:
@@ -92,25 +101,43 @@ def extract_next_links(url, resp):
         print(f'URL: {resp.url} | STATUS: <{resp.status}> | ERROR: "{resp.error}"', file=log)
 
     try:
+
+        # ---------------------------------------------
+        # ------------- LINK EXTRACTION ---------------
+        # ---------------------------------------------
         soup = BeautifulSoup(resp.raw_response.content, "html.parser")
 
         # Remove script and style elements
         for script_or_style in soup(['script', 'style']):
             script_or_style.decompose()
 
-
+        # Format text into space-separated lines for easier splitting
         page_text = soup.get_text(separator=' ', strip=True)
-        page_text = re.sub(r'[^a-zA-Z0-9\s]', '', page_text)  # remove non-alphanumeric characters
+        # remove non-alphanumeric characters
+        page_text = re.sub(r'[^a-zA-Z0-9\s]', '', page_text)
+        # normalize text with lowercase and split into words
         words = page_text.lower().split()
-        filtered_words = [word for word in words if word not in STOPWORDS]
+        filtered_words = [word for word in words if word not in STOPWORDS] # skip stopwords
+
+        
+        #Extract links
+        for anchor in soup.find_all('a', href=True):
+            href = anchor['href']
+            absolute_url = urljoin(url, href)
+            links.append(normalize_url(absolute_url))
+
+
+        # ---------------------------------------------
+        # ----------- UPDATE STATISTICS ---------------
+        # ---------------------------------------------
+
+        UNIQUE_PAGES += 1
 
         # check longest page
         if LONGEST_PAGE["count"] < len(words):
             LONGEST_PAGE["page"] = resp.url
             LONGEST_PAGE["count"] = len(words)
             print(f"NEW LONGEST PAGE: {len(words)}, {resp.url}")
-        
-        
         
         # Update words dict
         for word in filtered_words:
@@ -121,23 +148,16 @@ def extract_next_links(url, resp):
         parsed_url = urlparse(resp.url)
         SUBDOMAINS[parsed_url.netloc] += 1
 
-        #Extract links
-        for anchor in soup.find_all('a', href=True):
-            href = anchor['href']
-            absolute_url = urljoin(url, href)
-            links.append(normalize_url(absolute_url))
-
-        UNIQUE_PAGES += 1
-
         # ---------------------------------------------
         # --------- LOGGING ON OUR SIDE ---------------
         # ---------------------------------------------
 
         with open("./Logs/commonwords.txt", "w") as f:
-            print(f"LONGEST PAGE: {LONGEST_PAGE['count']}, {LONGEST_PAGE['page']}\n", file=f)
+            # Unique Pages stat
             print(f'UNIQUE PAGES FOUND: {UNIQUE_PAGES}\n', file=f)
-
-        # with open("./Logs/commonwords.txt", "a") as f:
+            # Longest Page stat
+            print(f"LONGEST PAGE: {LONGEST_PAGE['count']}, {LONGEST_PAGE['page']}\n", file=f)
+            # Top 50 Words stat
             sorted_dict_desc = dict(sorted(WORD_COUNTS.items(), key=lambda item: item[1], reverse=True))
             i = 0
             for key in sorted_dict_desc:
@@ -146,7 +166,7 @@ def extract_next_links(url, resp):
                     break
                 i += 1
             print('\n', file=f)
-            
+            # Subdomains stat
             sorted_subdomains = dict(sorted(SUBDOMAINS.items(), key=lambda item: item[0]))
             for key in sorted_subdomains:
                 print(f"{key}, {sorted_subdomains[key]}", file=f)
@@ -284,7 +304,7 @@ def is_valid(url):
                     return False
                 
             
-             # upon a preliminary scrape, all urls belonging to path including this string raise 4xx series errors
+            # upon a preliminary scrape, all urls belonging to path including this string raise 4xx series errors
             if ("prof-david-redmiles" in path):
                 return False
             
