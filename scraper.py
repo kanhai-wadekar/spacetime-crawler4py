@@ -198,10 +198,14 @@ def is_valid(url):
         if not any(domain in parsed.netloc for domain in ALLOWED_DOMAINS):
             return False
 
-        if any(parsed.netloc == url.netloc and parsed.path == url.path for url in ROBOTS_BLOCKED):
-            return False
+        # if any(parsed.netloc == url.netloc and parsed.path == url.path for url in ROBOTS_BLOCKED):
+        #     return False
         
-        if any(parsed.netloc == url.netloc and parsed.path == url.path for url in SERVER_SIDE_ERROR):
+        # if any(parsed.netloc == url.netloc and parsed.path == url.path for url in SERVER_SIDE_ERROR):
+        #     return False
+        # ^^^ replaced with: 
+        normalized_url = normalize_url(url)
+        if normalized_url in [normalize_url(u.geturl()) for u in ROBOTS_BLOCKED]:
             return False
 
         # In the case that the authority is *today.uci.edu.SOMETHING
@@ -251,8 +255,9 @@ def is_valid(url):
                 if (is_float(path[-1])):
                     return False
                 
-            if ("fuzzy" in path[-1] or (len(path) > 1 and "fuzzy" in path[-2])):
-                return False
+            # commented because too niche I think: 
+            # if ("fuzzy" in path[-1] or (len(path) > 1 and "fuzzy" in path[-2])):
+            #     return False
 
             # Prevents Trap in Homeland security page
             if ("EMWS09" in path):
