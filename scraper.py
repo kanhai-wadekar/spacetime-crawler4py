@@ -32,8 +32,26 @@ STOPWORDS = {
 }
 
 ALLOWED_DOMAINS = {".ics.uci.edu", ".cs.uci.edu", ".informatics.uci.edu", ".stat.uci.edu", "today.uci.edu"}
-ROBOTS_BLOCKED = {urlparse('https://cs.ics.uci.edu/people'), urlparse('http://kdd.ics.uci.edu'), urlparse('https://www.ics.uci.edu/people/'), urlparse('http://www.ics.uci.edu/happening/news'), urlparse('http://www.ics.uci.edu/people'), urlparse('http://intranet.ics.uci.edu')}
-SERVER_SIDE_ERROR = {urlparse('http://www.ics.uci.edu/research.htm'), urlparse('http://cloudberry.ics.uci.edu/apps/twittermap'), urlparse('http://cloudberry.ics.uci.edu/demos/twittermap'), urlparse("http://www.ics.uci.edu/mailing_lists.html"), urlparse("http://www.ics.uci.edu/4_07social_activities.html"), urlparse("http://www.ics.uci.edu/2_3tutorial proposals.html"), urlparse("http://www.ics.uci.edu/teachingics.html")}
+
+ROBOTS_BLOCKED = {
+    urlparse('https://cs.ics.uci.edu/people'), 
+    urlparse('http://kdd.ics.uci.edu'), 
+    urlparse('https://www.ics.uci.edu/people/'), 
+    urlparse('http://www.ics.uci.edu/happening/news'), 
+    urlparse('http://www.ics.uci.edu/people'), 
+    urlparse('http://intranet.ics.uci.edu')
+    }
+
+SERVER_SIDE_ERROR = {
+    urlparse('http://www.ics.uci.edu/research.htm'),
+    urlparse('http://cloudberry.ics.uci.edu/apps/twittermap'), 
+    urlparse('http://cloudberry.ics.uci.edu/demos/twittermap'), 
+    urlparse("http://www.ics.uci.edu/mailing_lists.html"), 
+    urlparse("http://www.ics.uci.edu/4_07social_activities.html"), 
+    urlparse("http://www.ics.uci.edu/2_3tutorial proposals.html"), 
+    urlparse("http://www.ics.uci.edu/teachingics.html")
+    }
+
 BAD_SUBDOMAINS = { "fano", "dblp", "jujube", "sli.ics.uci.edu", "computableplant.ics.uci.edu", "grape.ics.uci.edu" }
 
 # ---------------------------------------------
@@ -195,38 +213,35 @@ def is_valid(url):
         if parsed.scheme not in set(["http", "https"]):
             return False
 
+        # Restrict to allowed domains
         if not any(domain in parsed.netloc for domain in ALLOWED_DOMAINS):
             return False
 
+        # Block websites that have robots blocked
         if any(parsed.netloc == url.netloc and parsed.path == url.path for url in ROBOTS_BLOCKED):
             return False
         
+        # Block websites that cause 500s error (very specific)
         if any(parsed.netloc == url.netloc and parsed.path == url.path for url in SERVER_SIDE_ERROR):
             return False
-
-        # In the case that the authority is *today.uci.edu.SOMETHING
-        # this domain is not up for some reason  
         
-
-        # if not parsed.netloc.endswith(".uci.edu") and "today.uci.edu" not in parsed.netloc:
-        #     return False
-
+        # Blanket subdomains were heavily error-prone
         if any(subdomain in parsed.netloc for subdomain in BAD_SUBDOMAINS):
             return False
 
-        # MAYBE BLOCK https://grape.ics.uci.edu/wiki/asterix/timeline?from=2018   ?
         if (path):
-            if 'fr.ics.uci.edu' in parsed.netloc:
-                return False
-            
+
+            # Only allow the allowed domain to pass through
             if 'today.uci.edu' in parsed.netloc:
                 if parsed.path.startswith('department/information_computer_sciences'):
                     return True
                 return False
 
+            # Standalone people websites
             if ("~" in path[-1] and len(path) == 1):
                 return False
             
+            # Large size, hampers crawling
             if (any("uploads" in el  for el in path)):
                 return False
 
@@ -235,19 +250,19 @@ def is_valid(url):
             if (path[0] == "events" and len(path) > 1):
                 return False
                 
+            # Error prone domain
             if  "sli.ics.uci.edu" in parsed.netloc:
                 return False
-                # if path[0] == "Classes" or path[0] == "Pubs" or path[0] == "video":
-                #     return False
             
-
+            # Error prone domain
             if ("flamingo" in parsed.netloc):
+                # Full of errors
                 if ("apache" in path[-1]):
                     return False
-                
+                # Full of errors
                 if ("releases" in path and ("docs" in path or "src" in path)):
                     return False
-                
+                # specific case full of errors
                 if (is_float(path[-1])):
                     return False
                 
@@ -293,6 +308,7 @@ def is_valid(url):
                 return False
                 
             if path[0] == "~smyth":
+                # Error prone websites, tend to cause 400s
                 if len(path) > 1 and path[1] == 'courses':
                     return False
                 
@@ -308,6 +324,7 @@ def is_valid(url):
             if ("prof-david-redmiles" in path):
                 return False
             
+            # Error prone sites
             if ("doku.php" in path):
                 return False
 
@@ -315,6 +332,7 @@ def is_valid(url):
         
 
         return not re.match(
+            # Added more filters for exts that are too large or error prone (eg. powerpoints or different image types)
             r".*\.(css|js|bmp|gif|jpe?g|ico"
             + r"|png|tiff?|mid|mp2|mp3|mp4"
             + r"|wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf"
